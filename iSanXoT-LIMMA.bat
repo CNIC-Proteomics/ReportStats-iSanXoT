@@ -1,0 +1,6 @@
+@ECHO OFF
+
+SET SRC_HOME=%~dp0
+SET SRC_HOME=%SRC_HOME:~0,-1%
+
+START "" WSCRIPT "%SRC_HOME%\Launcher\iSanXoT-LIMMA.vbs" "%SRC_HOME%"

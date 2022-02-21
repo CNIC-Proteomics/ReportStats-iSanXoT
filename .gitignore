@@ -1,0 +1,5 @@
+/ChromiumPortable
+/R-Portable
+/ShinyApp/log/*
+!/ShinyApp/log/log.txt
+!/ShinyApp/tmp/rds.txt

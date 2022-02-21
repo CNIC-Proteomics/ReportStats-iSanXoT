@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iSanXoT Report Limma Calculator</title>
+
+    <!--
+    <link rel="stylesheet" href="assets/bootstrap.min.css">
+    <script src="assets/bootstrap.min.js.download"></script>
+    <script src="assets/jquery.js"></script>
+    <script src="assets/shiny.js"></script>
+    -->
+    
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <script src="bootstrap.min.js.download"></script>
+    <script src="jquery.js"></script>
+    <script src="shiny.js"></script>
+    
+
+</head>
+<body>
+    <div class="container-fluid border p-2" style="border-radius: .25rem;">
+        <div class="d-flex justify-content-center">
+            <div>
+                <img src="favicon.ico" height="150">
+            </div>
+            <h1 class="display-2 text-center align-self-center ml-2">iSanXoT Report: LIMMA</h1>
+        </div>
+        
+        
+        <hr/>
+        
+        <div class="container-fluid p-4">
+            <h1 class="display-6 text-center">Select iSanXoT Report</h1>
+            <div class="text-center">
+                <button type="button" class="btn btn-outline-secondary mt-3" 
+                style="width:150px;" onclick="fileSelect()">Click!</button>
+            </div>
+            <div class="text-center mt-3" id="filePath"></div>
+            <div class="text-center mt-3" id="jobID"></div>
+        </div>
+
+        <div class="container-fluid pb-4" style="display: none;" id="integrationData">
+            <hr/>
+            
+            <div class="container-fluid">
+                <h1 class="display-6 text-center">Integration Type</h1>
+                <div class="container-fluid d-flex justify-content-center flex-wrap align-content-center" id="integrationSet"></div>
+            </div>
+            
+            <div class="container-fluid mt-4">
+                <h1 class="display-6 text-center">Sample Type</h1>
+                <div class="container-fluid d-flex justify-content-center flex-wrap align-content-center" id="sampleSet"></div>
+                <div class="container d-flex mt-3 justify-content-center">
+                    <div class="m-1">
+                        <input class="form-control" type="text" placeholder="Group name" id="groupName" style="width:250px;">
+                    </div>
+                    <div class="m-1">
+                        <button type="button" class="btn btn-dark" onclick="addSelected()">Add Group</button>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-center container-fluid m-3" id="sampleGroups"></div>
+            </div>
+
+            <div class="container-fluid mt-4" id="testAllContent" style="display: none;">
+                <div class="container text-center">
+                    <h1 class="display-6 text-center">Hypothesis Testing</h1>
+                    <!-- <button type="button" class="btn btn-dark" onclick="hypTesting()">Load Hypothesis Testing</button> -->
+                </div>
+                <div class="d-flex flex-wrap justify-content-center mt-3" id="testContent" style="font-size: 1.2em;"></div>
+
+                <hr/>
+
+                <div class="container text-center" style="font-size: 1.3em;">
+                    <div id="execBtn">
+                        <button type="button" class="btn btn-outline-danger mt-3" 
+                        style="width:200px;" onclick="execute()">Calculate p-values</button>    
+                    </div>
+                    
+                    <div id="execLoad" class="spinner-border text-danger" style="display:none;"></div>
+
+                    <div id="execOpen" style="display:none;">
+                        <div class="container d-flex justify-content-center">
+                            <button type="button" class="btn btn-outline-secondary align-self-center" 
+                            style="width:200px;" onclick="openRes()">Open result folder</button>
+                            <button class="btn align-self-center" style="width:50px; font-size: 1.3em;" onclick="reset()">&#8635;</button>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</body>
+
+<script>
+    // Set constants
+    createObj = () => {
+        let obj = {
+        'jobID': "",
+        'objPath' : "",
+
+        'integrationSet': [],
+        'sampleSet': [],
+
+        'integrationSelected': [],
+        'sampleGroups': {},
+        'hypTesting': [],
+
+        'sample_tmp': [],
+        };
+
+        return obj;
+    }
+
+    var obj = createObj();
+
+    // Define functions
+    integrationButtonGenerator = function(id) {
+        let btn = `<button type="button" class="btn btn-outline-danger m-1" 
+        style="width:150px;" onclick="integrationSelect(this)">${id}</button>`;
+        return btn;
+    }
+
+    sampleButtonGenerator = function(id) {
+        let btn = `<button type="button" class="btn btn-outline-primary m-1 sampleButton" 
+        style="width:250px;" onclick="sampleSelect(this)">${id}</button>`;
+        return btn;
+    }
+
+    integrationSelect = function(elem) {
+
+        let id = elem.innerHTML;
+
+        if (obj['integrationSelected'].includes(id)) {
+            obj['integrationSelected'] = obj['integrationSelected'].filter((value) => {
+                return(value != id)
+            });
+            elem.classList.remove("active");
+        } else {
+            obj['integrationSelected'].push(id);
+            elem.classList.add("active");
+        }
+
+    }
+
+    sampleSelect = function(elem) {
+
+        let id = elem.innerHTML;
+
+        if (obj['sample_tmp'].includes(id)) {
+            obj['sample_tmp'] = obj['sample_tmp'].filter((value) => {
+                return(value != id)
+            });
+            elem.classList.remove("active");
+        } else {
+            obj['sample_tmp'].push(id);
+            elem.classList.add("active");
+        }
+
+    }
+
+    addSelected = function() {
+        let groupName = $('#groupName').val();
+
+        if (groupName == "") return;
+
+        if (Object.keys(obj['sampleGroups']).includes(groupName)) return;
+
+        if (obj['sample_tmp'].length == 0) return;
+
+        // html elements
+        let elem_str = obj['sample_tmp'].reduce((previousValue, currentValue) => {
+            return(`${previousValue}<div>${currentValue}</div>`);
+        }, "");
+
+        let group_elem_str = `
+            <div class="card m-2" id="${groupName}">
+                <div class="card-header text-center card-title">${groupName}</div>
+                <div class="card-body">${elem_str}</div>
+                <div class="card-footer text-center">
+                    <button type="button" class="btn-close" aria-label="Close" onclick="removeGroup('${groupName}')"></button>
+                </div>
+            </div>
+        `;
+
+        $("#sampleGroups").append(group_elem_str);
+
+        // json object
+        obj['sampleGroups'][groupName] = obj['sample_tmp']
+        obj['sample_tmp'] = [];
+        $('#groupName').val("");
+
+        $(".sampleButton").each((i, obj) => {
+            obj.classList.remove("active");
+        });
+
+        // hypothesis testing
+        hypTesting();
+        Object.keys(obj['sampleGroups']).length < 2 ? $("#testAllContent").hide() : $("#testAllContent").show();
+    }
+
+    removeGroup = (groupName) => {
+        $(`#${groupName}`).remove()
+        delete obj['sampleGroups'][groupName];
+
+        hypTesting();
+        Object.keys(obj['sampleGroups']).length < 2 ? $("#testAllContent").hide() : $("#testAllContent").show();
+    }
+
+    hypTesting = () => {
+        $("#testContent").children().each( (i,elem) => elem.remove());
+
+        let atoms = Object.keys(obj.sampleGroups)
+        let pairs = [];
+
+        for (let i=0; i<atoms.length; i++) {
+            for (let j=i+1; j<atoms.length; j++) {
+                pairs.push(`${atoms[j]} vs ${atoms[i]}`);
+            }
+        }
+
+        let i = 0
+        let hypTesting_cb = pairs.reduce((previousValue, id) => {
+            let template = `
+                <div class="form-check px-4 pt-1 mx-1">
+                    <input type="checkbox" class="form-check-input" id="cbTest-${i}" value="${id}" onchange="hypTestSelect()">
+                    <label class="form-check-label" for="cbTest-${i}">${id}</label>
+                </div>
+            `;
+            i++;
+            return previousValue + template;
+        }, "");
+        
+        $("#testContent").append(hypTesting_cb);
+    }
+
+    hypTestSelect = () => {
+        let elemSelect = $("#testContent").children().filter( (i, obj) => $(obj).children("input")[0].checked )
+        elemSelect = elemSelect.map( (i, obj) => $(obj).children("label")[0].innerHTML );
+        
+        obj['hypTesting'] = []
+        for (let i of elemSelect) obj['hypTesting'].push(i);
+    }
+
+
+    execute = () => {
+        
+        if (obj.hypTesting.length == 0) {
+            console.log("Missing hypothesis testing selection");
+            return;
+        }
+
+        if (obj.integrationSelected.length == 0) {
+            console.log("Missing integration type selection");
+            return;
+        }
+
+        // Shiny.onInputChange("obj", obj);
+        Shiny.setInputValue("execute", obj, {priority:"event"});
+
+        $("#execBtn").hide();
+        $("#execLoad").show();
+    }
+
+    reset = () => {
+        //location.reload()
+        obj = createObj();
+        $("#filePath").html("");
+        $("#jobID").html("");
+        $("#integrationSet").empty();
+        $("#sampleSet").empty();
+        $("#sampleGroups").empty();
+        $("#integrationData").hide();
+        $("#testAllContent").hide();
+        $("#execOpen").hide();
+        $("#execBtn").show();
+    }
+
+    // JS --> R
+    fileSelect = () => {
+        console.log("Selecting file...");
+        Shiny.setInputValue("fileSelect", true, {priority:"event"});
+    }
+
+    openRes = () => {
+        console.log(`Open results: ${obj.filePath}`);
+        Shiny.setInputValue("openRes", obj.filePath, {priority:"event"});
+    }
+
+    // R --> JS
+    Shiny.addCustomMessageHandler("selectedFilePath", (message) => {
+        console.log(`Job ID: ${message['jobID']}`);
+        console.log(`Selected file path: ${message['filePath']}`);
+        $("#filePath").html(message['filePath']);
+        $("#jobID").html(`job id: ${message['jobID']}`);
+    })
+
+    Shiny.addCustomMessageHandler("integrationData", (message) => {
+        
+        // get data
+        obj['jobID'] = message['jobID'];
+        obj['objPath'] = message['objPath'];
+        obj['integrationSet'] = message['integrationSet'];
+        obj['sampleSet'] = message['sampleSet'];
+        console.log('Integration Data Received');
+
+        // buttons
+        $("#integrationData").show();
+
+        obj['integrationSet'].forEach((value) => {
+            $("#integrationSet").append(integrationButtonGenerator(value));
+        });
+
+        obj['sampleSet'].forEach((value) => {
+            $("#sampleSet").append(sampleButtonGenerator(value));
+        });
+        
+    })
+
+    Shiny.addCustomMessageHandler("execOpen", (message) => {
+        $("#execLoad").hide();
+        $("#execOpen").show();
+        console.log(`Finished execution`);
+        obj['filePath'] = message;
+    })
+
+</script>
