@@ -2,4 +2,5 @@
 /R-Portable
 /ShinyApp/log/*
 !/ShinyApp/log/log.txt
+/ShinyApp/tmp/*
 !/ShinyApp/tmp/rds.txt
