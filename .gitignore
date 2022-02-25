@@ -4,3 +4,4 @@
 !/ShinyApp/log/log.txt
 /ShinyApp/tmp/*
 !/ShinyApp/tmp/rds.txt
+/*.zip

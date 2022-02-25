@@ -44,8 +44,29 @@
 
         <div class="container-fluid pb-4" style="display: none;" id="integrationData">
             <hr/>
-            
+
             <div class="container-fluid">
+                <h1 class="display-6 text-center">Test Type</h1>
+                <div class="d-flex flex-wrap justify-content-center mt-3">
+                    <div class="form-check px-4 pt-1 mx-3">
+                        <input type="checkbox" class="form-check-input" id="limma" value="limma" 
+                            onchange='{obj["testType"][this.value] = !obj["testType"][this.value]}'>
+                        <label class="form-check-label" for="limma">Limma</label>
+                    </div>
+                    <div class="form-check px-4 pt-1 mx-3">
+                        <input type="checkbox" class="form-check-input" id="limmaDup" value="limmaDup" 
+                            onchange='{obj["testType"][this.value] = !obj["testType"][this.value]}'>
+                        <label class="form-check-label" for="limmaDup">Limma (with duplicates)</label>
+                    </div>
+                    <div class="form-check px-4 pt-1 mx-3">
+                        <input type="checkbox" class="form-check-input" id="ttest" value="ttest" 
+                            onchange='{obj["testType"][this.value] = !obj["testType"][this.value]}'>
+                        <label class="form-check-label" for="ttest">Student's t-test</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="container-fluid mt-4">
                 <h1 class="display-6 text-center">Integration Type</h1>
                 <div class="container-fluid d-flex justify-content-center flex-wrap align-content-center" id="integrationSet"></div>
             </div>
@@ -83,9 +104,10 @@
 
                     <div id="execOpen" style="display:none;">
                         <div class="container d-flex justify-content-center">
-                            <button type="button" class="btn btn-outline-secondary align-self-center" 
+                            <span class="link-primary align-self-center px-2 mx-3" onclick="viewLogs()" style="font-size: 0.8em; cursor:pointer">View logs</span>
+                            <button type="button" class="btn btn-outline-secondary align-self-center mx-3" 
                             style="width:200px;" onclick="openRes()">Open result folder</button>
-                            <button class="btn align-self-center" style="width:50px; font-size: 1.3em;" onclick="reset()">&#8635;</button>
+                            <button class="btn align-self-center mx-3" style="width:50px; font-size: 1.3em;" onclick="reset()">&#8635;</button>
                         </div>
                     </div>
                     
@@ -111,6 +133,12 @@
         'sampleGroups': {},
         'hypTesting': [],
 
+        'testType': {
+            'limma': false,
+            'limmaDup': false,
+            'ttest': false
+        },
+
         'sample_tmp': [],
         };
 
@@ -122,7 +150,7 @@
     // Define functions
     integrationButtonGenerator = function(id) {
         let btn = `<button type="button" class="btn btn-outline-danger m-1" 
-        style="width:150px;" onclick="integrationSelect(this)">${id}</button>`;
+        style="width:180px;" onclick="integrationSelect(this)">${id}</button>`;
         return btn;
     }
 
@@ -171,7 +199,10 @@
 
         if (Object.keys(obj['sampleGroups']).includes(groupName)) return;
 
-        if (obj['sample_tmp'].length == 0) return;
+        if (obj['sample_tmp'].length < 2) {
+            alert("A group must contain more than one sample");
+            return;
+        }
 
         // html elements
         let elem_str = obj['sample_tmp'].reduce((previousValue, currentValue) => {
@@ -249,14 +280,25 @@
 
 
     execute = () => {
+
+        let testSelected = false
+        for (const testType in obj["testType"]) 
+            testSelected = testSelected || obj["testType"][testType]
+        if (!testSelected) {
+            console.log("Missing test type selection");
+            alert("Missing test type selection");
+            return;
+        }
         
-        if (obj.hypTesting.length == 0) {
-            console.log("Missing hypothesis testing selection");
+        if (obj.integrationSelected.length == 0) {
+            console.log("Missing integration type selection");
+            alert("Missing integration type selection");
             return;
         }
 
-        if (obj.integrationSelected.length == 0) {
-            console.log("Missing integration type selection");
+        if (obj.hypTesting.length == 0) {
+            console.log("Missing hypothesis testing selection");
+            alert("Missing hypothesis testing selection");
             return;
         }
 
@@ -279,17 +321,42 @@
         $("#testAllContent").hide();
         $("#execOpen").hide();
         $("#execBtn").show();
+        $("#limma").prop( "checked", false );
+        $("#limmaDup").prop( "checked", false );
+        $("#ttest").prop( "checked", false );
     }
 
+    // testTypeSelect = (elem) => obj["testType"][elem.value] = !obj["testType"][elem.value];
+
     // JS --> R
+    let areYouAlive = setInterval(() => {
+        try {
+            Shiny.setInputValue("areYouAlive", "", {priority:"event"});
+            console.log(`Application running`);
+        } catch(err) {
+            clearInterval(areYouAlive);
+            alert("Internal Error");
+            console.log("Application crashed");
+            close();
+        }
+        
+        
+    }, 10000)
+
     fileSelect = () => {
         console.log("Selecting file...");
         Shiny.setInputValue("fileSelect", true, {priority:"event"});
+        reset();
     }
 
     openRes = () => {
         console.log(`Open results: ${obj.filePath}`);
         Shiny.setInputValue("openRes", obj.filePath, {priority:"event"});
+    }
+
+    viewLogs = () => {
+        console.log(`View logs: ${obj['jobID']}`);
+        Shiny.setInputValue("viewLogs", obj.jobID, {priority:"event"});
     }
 
     // R --> JS

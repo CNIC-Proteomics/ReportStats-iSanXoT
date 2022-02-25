@@ -10,20 +10,23 @@ basicConfig()
 obj <- list(
   "jobID" = "",
   
-  "filePath"="",
-  "objPath"="",
-  #"repData"=data.frame(),
+  "filePath"="", # path to report
+  "objPath"="", # path to object with metadata
+  
   "colNames"=c(),
   "colTypes"=c(),
   
+  "integrations" = c(), # Which integrations are in the report
+  "samples" = c(), # Which samples are in the report
   "Zcols" = c(), # Index of columns with Z values
-  "integrations" = c(),
-  "samples" = c(),
   
-  "integrationSet" = c(),
-  "sampleSet" = c(),
+  #"levels" = c(), # which levels are in the report
+  #"Lcols" = c(), # column index of each level
   
-  "outPath" = ""
+  "integrationSet" = c(), # set of integrations
+  "sampleSet" = c(), # set of samples
+  
+  "outPath" = "" # path to output file
   
   )
 
@@ -45,12 +48,16 @@ readReport <- function(obj) {
   index <- 1
   for (i in updatedObj$colTypes) {
     
-    if (i != "LEVEL" & i != "REL") {
+    if (i != "LEVEL" & i != "REL" & i != "STATS" & i != "EXTRA") {
       updatedObj$Zcols <- append(updatedObj$Zcols, index)
       updatedObj$integrations <- append(updatedObj$integrations, 
                                         updatedObj$colNames[index])
       updatedObj$samples <- append(updatedObj$samples, i)
-    }
+    } #else if (i == "LEVEL") {
+      #updatedObj$Lcols <- append(updatedObj$Lcols, index)
+      #updatedObj$levels <- append(updatedObj$levels,
+      #                            updatedObj$colNames[index])
+    #}
    
     index <- index + 1 
   }
@@ -66,6 +73,31 @@ readReport <- function(obj) {
   return (updatedObj)
 }
 
+LIMMA <- function(obj, Target, x, integration, eset, type) {
+  
+  f <- factor(Target, levels=names(obj$sampleGroups))
+  design <- model.matrix(~0+f)
+  colnames(design) <- names(obj$sampleGroups)
+  fit <- lmFit(eset, design)
+  
+  #x <- gsub(" vs ", "-", obj$hypTesting)
+  contrast.matrix <- makeContrasts(contrasts=x, levels=names(obj$sampleGroups))
+  
+  fit2 <- contrasts.fit(fit, contrast.matrix)
+  fit2 <- eBayes(fit2)
+  
+  tmp <- as.data.frame(fit2$p.value)
+  newColname <- c()
+  for (i in colnames(tmp)) {
+    newColname <- append(newColname, paste(integration, type, i, sep="_"))
+  }
+  colnames(tmp) <- newColname
+  
+  loginfo(paste0(integration, " - Prior Variance: ", fit2$s2.prior), logger=obj$jobID)
+  loginfo(paste0(integration, " - Prior Degrees of Freedom: ", fit2$df.prior), logger=obj$jobID)
+  
+  return (tmp)
+}
 
 classicTTEST <- function(eset, Target, x, integration) {
 
@@ -97,6 +129,16 @@ calculatePvalues <- function(obj) {
   
   for (integration in obj$integrationSelected) {
     
+    loginfo(paste0("Performing calculations: ", integration), logger=obj$jobID)
+    
+    # Get vector with low level
+    lowLevel <- strsplit(gsub("Z_", "", integration), "2")[[1]][1]
+    lowLevelCol <- as.vector(
+      unlist(reportData[obj$colTypes == "LEVEL" & obj$colNames == lowLevel][1])
+    )
+    pvalues_df_tmp <- data.frame(row.names = 1:nrow(reportData))
+    pvalues_df_tmp$low <- lowLevelCol
+    
     # dataframe containing working Z
     eset <- data.frame(row.names = 1:nrow(reportData))
     
@@ -110,48 +152,57 @@ calculatePvalues <- function(obj) {
         sampleBool <- sample == obj$samples
         
         zColBool <- integrationBool & sampleBool
-        
         zColIndex <- obj$Zcols[zColBool]
         
         eset <- cbind(eset, reportData[zColIndex])
         
         Target <- append(Target, group)
-        
       }
       
     }
     
+
     # LIMMA
-    f <- factor(Target, levels=names(obj$sampleGroups))
-    design <- model.matrix(~0+f)
-    colnames(design) <- names(obj$sampleGroups)
-    fit <- lmFit(eset, design)
-    
     x <- gsub(" vs ", "-", obj$hypTesting)
-    contrast.matrix <- makeContrasts(contrasts=x, levels=names(obj$sampleGroups))
     
-    fit2 <- contrasts.fit(fit, contrast.matrix)
-    fit2 <- eBayes(fit2)
-    
-    tmp <- fit2$p.value
-    newColname <- c()
-    for (i in colnames(tmp)) {
-      newColname <- append(newColname, paste(integration, 'limma', i, sep="_"))
+    if (obj$testType['limma']) { # removing duplicates
+      loginfo(paste0(integration, " - Applying LIMMA"), logger=obj$jobID)
+      
+      lowLevelSet_bool <- !duplicated(lowLevelCol)
+      tmp <- LIMMA(obj, Target, x, integration, eset[lowLevelSet_bool,], "limma")
+      
+      lowLevelSet <- lowLevelCol[lowLevelSet_bool]
+      tmp$low <- lowLevelSet
+      
+      # merge is changing the order... and we MUST preserve it
+      pvalues_df_tmp$index <- 1:nrow(pvalues_df_tmp)
+      pvalues_df_tmp <- merge(pvalues_df_tmp, tmp, by="low", sort=FALSE) # still changes order
+      pvalues_df_tmp <- pvalues_df_tmp[order(pvalues_df_tmp$index),]
+      pvalues_df_tmp <- pvalues_df_tmp[, !(names(pvalues_df_tmp) %in% c("index"))]
     }
-    colnames(tmp) <- newColname
-    pvalues_df <- cbind(pvalues_df, tmp)
     
-    loginfo(paste0("LIMMA applied to ", integration), logger=obj$jobID)
+    
+    if (obj$testType['limmaDup']) {
+      loginfo(paste0(integration, " - Applying LIMMA with duplicates"), logger=obj$jobID)
+      tmp <- LIMMA(obj, Target, x, integration, eset, "limmaDup")
+      pvalues_df_tmp <- cbind(pvalues_df_tmp, tmp)
+    }
     
     #TTEST
-    pvalues_ttest <- classicTTEST(eset, Target, x, integration)
-    pvalues_df <- cbind(pvalues_df, pvalues_ttest)
+    if (obj$testType['ttest']) {
+      loginfo(paste0(integration, " - Calculating t-test"), logger=obj$jobID)
+      pvalues_ttest <- classicTTEST(eset, Target, x, integration)
+      pvalues_df_tmp <- cbind(pvalues_df_tmp, pvalues_ttest)
+    }
+    
+    pvalues_df <- cbind(pvalues_df, pvalues_df_tmp[-1])
     
   }
   
-  loginfo("Generating output table...", logger=obj$jobID)
   
-  # Generate final table
+  # OUTPUT TABLE
+  loginfo("Generating output table...", logger=obj$jobID)
+
   header <- read.csv(obj$filePath, header=FALSE, sep="\t", nrows=2)
   
   for (i in colnames(pvalues_df)) {
@@ -159,7 +210,6 @@ calculatePvalues <- function(obj) {
   }
   
   reportData <- cbind(reportData, pvalues_df)
-  #reportData <- data.frame(apply(reportData, 2, as.character))
   reportData <- data.frame(mapply('c', header, reportData))
   
   outDir <- dirname(obj$filePath)
@@ -219,6 +269,7 @@ server <- function (input, output, session) {
     obj$integrationSelected <- unlist(input$execute$integrationSelected)
     obj$sampleGroups <- input$execute$sampleGroups
     obj$hypTesting <- unlist(input$execute$hypTesting)
+    obj$testType <- unlist(input$execute$testType)
     
     loginfo("Executing LIMMA...", logger=obj$jobID)
     obj$outPath = calculatePvalues(obj)
@@ -229,6 +280,14 @@ server <- function (input, output, session) {
   
   observeEvent(input$openRes, {
     shell.exec(dirname(input$openRes))
+  })
+  
+  observeEvent(input$viewLogs, {
+    shell.exec(paste(getwd(), "log", paste(input$viewLogs, ".log", sep=""), sep="/"))
+  })
+  
+  observeEvent(input$areYouAlive, {
+    cat("Bottle found\n")
   })
   
   
