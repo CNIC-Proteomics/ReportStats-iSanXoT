@@ -5,7 +5,7 @@ import sys
 
 # main function
 if __name__ == "__main__":
-    version = sys.argv[1]
+    version = sys.argv[1] #"vx.y"
     versionName = f"ReportStats-iSanXoT-{version}"
     home = os.getcwd()
     version_dir = os.path.join(home, versionName)
