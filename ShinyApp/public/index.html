@@ -82,7 +82,7 @@
                         <button type="button" class="btn btn-dark" onclick="addSelected()">Add Group</button>
                     </div>
                 </div>
-                <div class="d-flex justify-content-center container-fluid m-3" id="sampleGroups"></div>
+                <div class="d-flex justify-content-center container-fluid m-3 flex-wrap align-content-center" id="sampleGroups"></div>
             </div>
 
             <div class="container-fluid mt-4" id="testAllContent" style="display: none;">
@@ -148,15 +148,15 @@
     var obj = createObj();
 
     // Define functions
-    integrationButtonGenerator = function(id) {
+    integrationButtonGenerator = function(id, widthLetter) {
         let btn = `<button type="button" class="btn btn-outline-danger m-1" 
-        style="width:180px;" onclick="integrationSelect(this)">${id}</button>`;
+        style="width:${12*widthLetter+100}px;" onclick="integrationSelect(this)">${id}</button>`;
         return btn;
     }
 
-    sampleButtonGenerator = function(id) {
+    sampleButtonGenerator = function(id, widthLetter) {
         let btn = `<button type="button" class="btn btn-outline-primary m-1 sampleButton" 
-        style="width:250px;" onclick="sampleSelect(this)">${id}</button>`;
+        style="width:${8.5*widthLetter+100}px;" onclick="sampleSelect(this)">${id}</button>`;
         return btn;
     }
 
@@ -196,6 +196,8 @@
         let groupName = $('#groupName').val();
 
         if (groupName == "") return;
+
+        groupName = groupName.replace(/\s/g, "_");
 
         if (Object.keys(obj['sampleGroups']).includes(groupName)) return;
 
@@ -379,12 +381,14 @@
         // buttons
         $("#integrationData").show();
 
+        let widthLetter = (Math.max(...obj['integrationSet'].map(value => value.length)));
         obj['integrationSet'].forEach((value) => {
-            $("#integrationSet").append(integrationButtonGenerator(value));
+            $("#integrationSet").append(integrationButtonGenerator(value, widthLetter));
         });
 
+        widthLetter = (Math.max(...obj['sampleSet'].map(value => value.length)));
         obj['sampleSet'].forEach((value) => {
-            $("#sampleSet").append(sampleButtonGenerator(value));
+            $("#sampleSet").append(sampleButtonGenerator(value, widthLetter));
         });
         
     })
