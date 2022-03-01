@@ -5,3 +5,4 @@
 /ShinyApp/tmp/*
 !/ShinyApp/tmp/rds.txt
 /*.zip
+.Rhistory
