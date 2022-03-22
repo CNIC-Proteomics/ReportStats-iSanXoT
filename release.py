@@ -7,13 +7,16 @@ import glob
 # main function
 if __name__ == "__main__":
     version = sys.argv[1] #"vx.y"
+    mode = sys.argv[2] # "chromium" or "browser"
+
     versionName = f"ReportStats-iSanXoT-{version}"
+    versionName += "-browser" if mode == "browser" else ""
     home = os.getcwd()
     version_dir = os.path.join(home, versionName)
 
     os.mkdir(version_dir)
 
-    shutil.copytree(os.path.join(home, "ChromiumPortable"), os.path.join(version_dir, "ChromiumPortable"))
+    if mode == "chromium": shutil.copytree(os.path.join(home, "ChromiumPortable"), os.path.join(version_dir, "ChromiumPortable"))
     shutil.copytree(os.path.join(home, "R-Portable"), os.path.join(version_dir, "R-Portable"))
     shutil.copytree(os.path.join(home, "ShinyApp"), os.path.join(version_dir, "ShinyApp"))
     shutil.copytree(os.path.join(home, "Launcher"), os.path.join(version_dir, "Launcher"))

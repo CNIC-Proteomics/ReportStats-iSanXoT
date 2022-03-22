@@ -212,9 +212,10 @@ calculatePvalues <- function(obj) {
   reportData <- cbind(reportData, pvalues_df)
   reportData <- data.frame(mapply('c', header, reportData))
   
-  outDir <- dirname(obj$filePath)
+  outDir <- dirname(obj$filePath) # dirname changes \\ --> /, yielding error in \\tierra...
+  outDir <- gsub("/", "\\\\", outDir) # fix it //tierra...
   outFile <- paste("LIMMA", basename(obj$filePath), sep="_")
-  outPath <- paste(outDir, outFile, sep="/")
+  outPath <- paste(outDir, outFile, sep="\\")
   
   write.table(reportData, file = outPath, quote = F, sep = "\t", row.names = F,
               col.names = F, na="")
@@ -279,11 +280,11 @@ server <- function (input, output, session) {
   })
   
   observeEvent(input$openRes, {
-    shell.exec(dirname(input$openRes))
+    shell.exec(gsub('/', '\\\\', dirname(input$openRes)))
   })
   
   observeEvent(input$viewLogs, {
-    shell.exec(paste(getwd(), "log", paste(input$viewLogs, ".log", sep=""), sep="/"))
+    shell.exec(paste(getwd(), "log", paste(input$viewLogs, ".log", sep=""), sep="\\"))
   })
   
   observeEvent(input$areYouAlive, {

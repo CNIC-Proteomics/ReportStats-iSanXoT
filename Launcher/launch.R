@@ -13,3 +13,4 @@ launch.browser = function(appUrl, browser.path=chrome.portable) {
 }
 
 runApp("ShinyApp", launch.browser = launch.browser)
+#runApp("ShinyApp", launch.browser = TRUE)
